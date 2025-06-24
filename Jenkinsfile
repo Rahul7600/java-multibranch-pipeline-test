@@ -13,15 +13,19 @@ pipeline {
         }
         stage('Deploy') {
             steps {
-                withCredentials([sshUserPrivateKey(credentialsId: 'ssh-key-root-142.93.222.67',
-                                                  keyFileVariable: 'SSH_KEY')]) {
+                withCredentials([usernamePassword(credentialsId: 'ssh-password-root-142.93.222.67', 
+                                                  usernameVariable: 'SSH_USER', 
+                                                  passwordVariable: 'SSH_PASS')]) {
                     sh """
-                    ssh -i $SSH_KEY -o StrictHostKeyChecking=no ${DEPLOY_USER}@${DEPLOY_SERVER} '
+                    sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no ${SSH_USER}@${DEPLOY_SERVER} '
                         mkdir -p ${DEPLOY_PATH}
-                        pkill -f "${DEPLOY_PATH}/app.jar" || true
+                        pkill -f "${DEPLOY_PATH}/app.jar" || echo "No running app instance found to stop."
+                    '
+                    sshpass -p "$SSH_PASS" scp target/*.jar ${SSH_USER}@${DEPLOY_SERVER}:${DEPLOY_PATH}/app.jar
+                    sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no ${SSH_USER}@${DEPLOY_SERVER} '
                         nohup java -jar ${DEPLOY_PATH}/app.jar > ${DEPLOY_PATH}/app.log 2>&1 &
                         sleep 5
-                        ps -ef | grep "java -jar" || echo "Application did not start!"
+                        ps -ef | grep "[j]ava -jar" || echo "Application did not start!"
                         tail -n 20 ${DEPLOY_PATH}/app.log
                     '
                     """
